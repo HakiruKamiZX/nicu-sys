@@ -39,10 +39,12 @@ In the project's root folder, create a new file named .env.
 
 Open the .env file and add your MySQL connection details. Replace the placeholder values with your actual database credentials.
 
+```
 DB_HOST=localhost
 DB_USER=your_mysql_username
 DB_PASSWORD=your_mysql_password
 DB_DATABASE=your_database_name
+```
 
 Step 5: Run the Application
 In your terminal (still in the project folder), run this command to start the server:
