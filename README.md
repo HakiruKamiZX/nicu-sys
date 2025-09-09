@@ -1,7 +1,7 @@
 NICU Charting Web Application
 This project is a full-stack web application for managing NICU patient data. It consists of a Node.js/Express backend that connects to a MySQL database and a plain HTML, CSS, and JavaScript frontend.
 
-Project Structure
+1. Project Structure
 ⋅⋅⋅⋅* package.json: Lists the project dependencies.
 
 ⋅⋅⋅⋅* server.js: The main backend server file.
