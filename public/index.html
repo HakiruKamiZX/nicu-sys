@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NICU Charting Application</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .page { display: none; }
+        .page.active { display: block; }
+        .page-transition { transition: opacity 0.3s ease-in-out; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div id="app" class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- Header -->
+        <header class="bg-white shadow-md rounded-lg p-4 mb-6 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-blue-600">NICU Charting System</h1>
+                <p id="breadcrumb" class="text-sm text-gray-500">Patient List</p>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main>
+            <!-- Page 1: Patient List -->
+            <div id="page-patients" class="page active page-transition">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold">Patient Management</h2>
+                        <button onclick="showAddPatientForm()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">+ Add New Patient</button>
+                    </div>
+
+                    <!-- Add Patient Form (Initially Hidden) -->
+                    <div id="add-patient-form-container" class="hidden mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <h3 class="text-lg font-semibold mb-2">New Patient Details</h3>
+                        <form id="add-patient-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <input type="text" id="patient-name" placeholder="Patient Name" class="p-2 border rounded-md" required>
+                            <input type="text" id="mrn" placeholder="Medical Record Number" class="p-2 border rounded-md" required>
+                            <input type="date" id="dob" class="p-2 border rounded-md" required>
+                            <select id="gender" class="p-2 border rounded-md" required>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <textarea id="diagnosis" placeholder="Admission Diagnosis" class="p-2 border rounded-md sm:col-span-2" rows="2"></textarea>
+                            <div class="sm:col-span-2 flex justify-end space-x-2">
+                                <button type="button" onclick="hideAddPatientForm()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">Cancel</button>
+                                <button type="submit" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Save Patient</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Patient Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="bg-gray-200">
+                                    <th class="p-3">MRN</th>
+                                    <th class="p-3">Name</th>
+                                    <th class="p-3">Date of Birth</th>
+                                    <th class="p-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="patient-list-body">
+                                <!-- Patient rows will be injected here by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page 2: Daily Records -->
+            <div id="page-daily-records" class="page page-transition">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                         <div>
+                            <h2 class="text-xl font-semibold">Daily Records for <span id="records-patient-name" class="text-blue-600"></span></h2>
+                         </div>
+                        <div class="flex space-x-2">
+                            <button onclick="navigateTo('patients')" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">&larr; Back to Patients</button>
+                            <button onclick="addDailyRecord()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">+ Add Today's Record</button>
+                        </div>
+                    </div>
+                     <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="bg-gray-200">
+                                    <th class="p-3">Record Date</th>
+                                    <th class="p-3">Nurse on Duty</th>
+                                    <th class="p-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="daily-records-body">
+                                <!-- Daily record rows injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page 3: Hourly Charting -->
+            <div id="page-charting" class="page">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 class="text-2xl font-bold" id="charting-patient-name">Patient Name</h2>
+                        <p class="text-gray-600" id="charting-record-date">Record Date</p>
+                    </div>
+                    <button onclick="navigateTo('daily-records', currentState.patient)" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">&larr; Back to Records</button>
+                </div>
+
+                <!-- Combined Entry Form -->
+                <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                    <form id="hourly-entry-form">
+                        <h3 class="text-xl font-semibold mb-4 border-b pb-2">Add New Hourly Entry</h3>
+                        
+                        <!-- Time Input -->
+                        <div class="mb-6">
+                            <label for="entry-time" class="block text-sm font-medium text-gray-700 mb-1">Entry Time</label>
+                            <input type="datetime-local" id="entry-time" class="w-full md:w-1/3 p-2 border border-gray-300 rounded-md shadow-sm" required>
+                        </div>
+
+                        <!-- Two-column layout for Vitals and Fluids -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                            
+                            <!-- Vitals Section -->
+                            <div class="p-4 bg-gray-50 rounded-lg border space-y-4">
+                                <h4 class="text-lg font-semibold text-gray-800">Vital Signs</h4>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="temperature" class="block text-sm font-medium text-gray-700">Temp (°C)</label>
+                                        <input type="number" step="0.1" id="temperature" placeholder="37.0" class="mt-1 w-full p-2 border border-gray-300 rounded-md">
+                                    </div>
+                                    <div>
+                                        <label for="heart-rate" class="block text-sm font-medium text-gray-700">Heart Rate</label>
+                                        <input type="number" id="heart-rate" placeholder="140" class="mt-1 w-full p-2 border border-gray-300 rounded-md">
+                                    </div>
+                                    <div>
+                                        <label for="resp-rate" class="block text-sm font-medium text-gray-700">Resp. Rate</label>
+                                        <input type="number" id="resp-rate" placeholder="45" class="mt-1 w-full p-2 border border-gray-300 rounded-md">
+                                    </div>
+                                    <div>
+                                        <label for="sat-o2" class="block text-sm font-medium text-gray-700">O2 Sat (%)</label>
+                                        <input type="number" id="sat-o2" placeholder="98" class="mt-1 w-full p-2 border border-gray-300 rounded-md">
+                                    </div>
+                                    <div>
+                                        <label for="bp" class="block text-sm font-medium text-gray-700">Blood Pressure</label>
+                                        <input type="text" id="bp" placeholder="80/45" class="mt-1 w-full p-2 border border-gray-300 rounded-md">
+                                    </div>
+                                    <div>
+                                        <label for="map" class="block text-sm font-medium text-gray-700">MAP</label>
+                                        <input type="number" id="map" placeholder="57" class="mt-1 w-full p-2 border border-gray-300 rounded-md">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Fluid Balance Section -->
+                            <div class="p-4 bg-gray-50 rounded-lg border space-y-4">
+                                <h4 class="text-lg font-semibold text-gray-800">Fluid Balance (ml)</h4>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="intake-oral" class="block text-sm font-medium text-gray-700">Intake (Oral)</label>
+                                        <input type="number" step="0.1" id="intake-oral" placeholder="5.0" class="mt-1 w-full p-2 border border-gray-300 rounded-md">
+                                    </div>
+                                    <div>
+                                        <label for="intake-iv" class="block text-sm font-medium text-gray-700">Intake (IV)</label>
+                                        <input type="number" step="0.1" id="intake-iv" placeholder="10.5" class="mt-1 w-full p-2 border border-gray-300 rounded-md">
+                                    </div>
+                                    <div>
+                                        <label for="intake-meds" class="block text-sm font-medium text-gray-700">Intake (Meds)</label>
+                                        <input type="number" step="0.1" id="intake-meds" placeholder="1.0" class="mt-1 w-full p-2 border border-gray-300 rounded-md">
+                                    </div>
+                                    <div>
+                                        <label for="output-urine" class="block text-sm font-medium text-gray-700">Output (Urine)</label>
+                                        <input type="number" step="0.1" id="output-urine" placeholder="15.0" class="mt-1 w-full p-2 border border-gray-300 rounded-md">
+                                    </div>
+                                    <div>
+                                        <label for="output-feces" class="block text-sm font-medium text-gray-700">Output (Feces)</label>
+                                        <input type="number" step="0.1" id="output-feces" placeholder="0" class="mt-1 w-full p-2 border border-gray-300 rounded-md">
+                                    </div>
+                                    <div>
+                                        <label for="output-vomit" class="block text-sm font-medium text-gray-700">Output (Vomit)</label>
+                                        <input type="number" step="0.1" id="output-vomit" placeholder="0" class="mt-1 w-full p-2 border border-gray-300 rounded-md">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="mt-6">
+                            <button type="submit" class="w-full md:w-auto bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition duration-200">
+                                Save Hourly Entry
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+
+                <!-- Hourly Log Display -->
+                <div class="bg-white rounded-lg shadow-md">
+                    <h3 class="text-xl font-semibold p-4 border-b">Hourly Log</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="bg-gray-100 text-sm">
+                                    <th class="p-3">Time</th>
+                                    <th class="p-3">Temp</th>
+                                    <th class="p-3">HR</th>
+                                    <th class="p-3">RR</th>
+                                    <th class="p-3">O2%</th>
+                                    <th class="p-3">Oral In</th>
+                                    <th class="p-3">IV In</th>
+                                    <th class="p-3">Urine Out</th>
+                                    <th class="p-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="hourly-log-body">
+                                <!-- Log rows will be injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+    <script src="/js/app.js"></script>
+</body>
+</html>
+
