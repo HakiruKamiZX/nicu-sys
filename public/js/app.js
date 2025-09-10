@@ -1,88 +1,55 @@
-document.addEventListener('DOMContentLoaded', () => {
-    navigateTo('patients');
-});
+document.addEventListener('DOMContentLoaded', () => navigateTo('patients'));
 
-// --- STATE MANAGEMENT ---
-const currentState = {
-    page: 'patients',
-    patient: null,
-    record: null,
-};
+const currentState = { page: 'patients', patient: null, record: null };
 
 // --- API Abstraction ---
-
-// NEW: A more robust way to handle API responses, including empty ones.
 const handleResponse = async (response) => {
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+        throw new Error(errorData.error || `Request failed: ${response.status}`);
     }
-    // For DELETE requests that might not return a body
-    if (response.status === 204 || response.headers.get('content-length') === '0') {
-        return null;
-    }
+    if (response.status === 204) return null;
     return response.json();
 };
 
 const API = {
     getPatients: () => fetch('/api/patients').then(handleResponse),
-    addPatient: (patientData) => fetch('/api/patients', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patientData)
-    }).then(handleResponse),
-    deletePatient: (patientId) => fetch(`/api/patients/${patientId}`, { method: 'DELETE' }).then(handleResponse),
-    
-    getRecordsForPatient: (patientId) => fetch(`/api/patients/${patientId}/records`).then(handleResponse),
-    addRecord: (recordData) => fetch('/api/records', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(recordData)
-    }).then(handleResponse),
-    deleteRecord: (recordId) => fetch(`/api/records/${recordId}`, { method: 'DELETE' }).then(handleResponse),
-
-    getChartData: (recordId) => fetch(`/api/records/${recordId}/chart`).then(handleResponse),
-    
-    addEntry: (entryData) => fetch('/api/entries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(entryData)
-    }).then(handleResponse),
-
-    deleteEntry: (deleteData) => fetch('/api/entries', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(deleteData)
-    }).then(handleResponse),
+    addPatient: (data) => fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(handleResponse),
+    deletePatient: (id) => fetch(`/api/patients/${id}`, { method: 'DELETE' }).then(handleResponse),
+    getRecordsForPatient: (id) => fetch(`/api/patients/${id}/records`).then(handleResponse),
+    addRecord: (data) => fetch('/api/records', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(handleResponse),
+    deleteRecord: (id) => fetch(`/api/records/${id}`, { method: 'DELETE' }).then(handleResponse),
+    getEntries: (id) => fetch(`/api/records/${id}/entries`).then(handleResponse),
+    addEntry: (data) => fetch('/api/entries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(handleResponse),
+    deleteEntry: (data) => fetch('/api/entries', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(handleResponse),
 };
 
-// --- NAVIGATION ---
+// --- Navigation ---
 function navigateTo(page, data = null) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(`page-${page}`).classList.add('active');
     currentState.page = page;
 
     const breadcrumb = document.getElementById('breadcrumb');
-
     switch (page) {
         case 'patients':
-            breadcrumb.textContent = 'Patient List';
+            breadcrumb.textContent = 'Daftar Pasien';
             renderPatientList();
             break;
         case 'daily-records':
             currentState.patient = data;
-            breadcrumb.textContent = `Patient List > ${data.name}`;
+            breadcrumb.textContent = `Daftar Pasien > ${data.name}`;
             renderDailyRecords();
             break;
         case 'charting':
             currentState.record = data;
-            breadcrumb.textContent = `Patient List > ${currentState.patient.name} > Chart`;
+            breadcrumb.textContent = `Daftar Pasien > ${currentState.patient.name} > Grafik`;
             renderHourlyChart();
             break;
     }
 }
 
-// --- RENDERING FUNCTIONS ---
+// --- Rendering ---
 async function renderPatientList() {
     try {
         const patients = await API.getPatients();
@@ -90,21 +57,17 @@ async function renderPatientList() {
         tbody.innerHTML = '';
         patients.forEach(p => {
             const tr = document.createElement('tr');
-            tr.className = 'border-b hover:bg-gray-50';
             tr.innerHTML = `
                 <td class="p-3">${p.mrn}</td>
                 <td class="p-3 font-medium">${p.name}</td>
-                <td class="p-3">${new Date(p.dob).toLocaleDateString()}</td>
+                <td class="p-3">${p.dob_time ? new Date(p.dob_time).toLocaleDateString() : 'N/A'}</td>
                 <td class="p-3 space-x-4">
-                    <button onclick='viewDailyRecords(${JSON.stringify(p)})' class="text-blue-600 hover:underline">View Records</button>
-                    <button onclick='deletePatient(${p.id}, "${p.name}")' class="text-red-600 hover:underline">Delete</button>
-                </td>
-            `;
+                    <button onclick='viewDailyRecords(${JSON.stringify(p)})' class="text-blue-600 hover:underline">Lihat Catatan</button>
+                    <button onclick='deletePatient(${p.id}, "${p.name}")' class="text-red-600 hover:underline">Hapus</button>
+                </td>`;
             tbody.appendChild(tr);
         });
-    } catch (error) {
-        alert(`Error fetching patients: ${error.message}`);
-    }
+    } catch (error) { alert(`Error: ${error.message}`); }
 }
 
 async function renderDailyRecords() {
@@ -115,77 +78,48 @@ async function renderDailyRecords() {
         tbody.innerHTML = '';
         records.forEach(r => {
             const tr = document.createElement('tr');
-            tr.className = 'border-b hover:bg-gray-50';
             tr.innerHTML = `
                 <td class="p-3 font-medium">${new Date(r.date).toLocaleDateString()}</td>
                 <td class="p-3">${r.nurse}</td>
                 <td class="p-3 space-x-4">
-                    <button onclick='viewCharting(${JSON.stringify(r)})' class="text-blue-600 hover:underline">View Chart</button>
-                    <button onclick='deleteRecord(${r.id}, "${new Date(r.date).toLocaleDateString()}")' class="text-red-600 hover:underline">Delete</button>
-                </td>
-            `;
+                    <button onclick='viewCharting(${JSON.stringify(r)})' class="text-blue-600 hover:underline">Lihat Grafik</button>
+                    <button onclick='deleteRecord(${r.id}, "${new Date(r.date).toLocaleDateString()}")' class="text-red-600 hover:underline">Hapus</button>
+                </td>`;
             tbody.appendChild(tr);
         });
-    } catch (error) {
-        alert(`Error fetching records: ${error.message}`);
-    }
+    } catch (error) { alert(`Error: ${error.message}`); }
 }
 
 async function renderHourlyChart() {
     try {
         document.getElementById('charting-patient-name').textContent = currentState.patient.name;
         document.getElementById('charting-record-date').textContent = new Date(currentState.record.date).toLocaleDateString();
-
-        const { vitals, fluids } = await API.getChartData(currentState.record.id);
+        const entries = await API.getEntries(currentState.record.id);
         const tbody = document.getElementById('hourly-log-body');
         tbody.innerHTML = '';
-
-        const chartData = {};
-        [...vitals, ...fluids].forEach(item => {
-            const timeKey = new Date(item.time).toISOString();
-            if (!chartData[timeKey]) chartData[timeKey] = {};
-            Object.assign(chartData[timeKey], item);
-        });
-
-        const sortedTimes = Object.keys(chartData).sort((a, b) => new Date(b) - new Date(a));
-
-        if (sortedTimes.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9" class="p-3 text-center text-gray-500">No hourly entries for this date.</td></tr>`;
-            return;
-        }
-
-        sortedTimes.forEach(timeISO => {
-            const data = chartData[timeISO];
+        entries.forEach(e => {
             const tr = document.createElement('tr');
-            tr.className = 'border-b';
-            const displayTime = new Date(timeISO).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const displayTime = new Date(e.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             tr.innerHTML = `
                 <td class="p-3 font-medium">${displayTime}</td>
-                <td class="p-3">${data.temp || '—'}</td>
-                <td class="p-3">${data.hr || '—'}</td>
-                <td class="p-3">${data.rr || '—'}</td>
-                <td class="p-3">${data.o2 || '—'}</td>
-                <td class="p-3">${data.intakeOral || '—'}</td>
-                <td class="p-3">${data.intakeIv || '—'}</td>
-                <td class="p-3">${data.outputUrine || '—'}</td>
+                <td class="p-3">${e.td_vital || '—'}</td>
+                <td class="p-3">${e.map_vital || '—'}</td>
+                <td class="p-3">${e.sat_o2 || '—'}</td>
+                <td class="p-3">${e.urine || '—'}</td>
+                <td class="p-3">${e.vm_mode || '—'}</td>
+                <td class="p-3">${e.vm_fio2 || '—'}</td>
                 <td class="p-3">
-                    <button onclick='deleteEntry("${timeISO}")' class="text-red-600 hover:underline">Delete</button>
-                </td>
-            `;
+                    <button onclick='deleteEntry("${e.time}")' class="text-red-600 hover:underline">Hapus</button>
+                </td>`;
             tbody.appendChild(tr);
         });
-
         prefillTimeField();
-    } catch (error) {
-        alert(`Error rendering chart: ${error.message}`);
-    }
+    } catch (error) { alert(`Error: ${error.message}`); }
 }
 
-
-// --- UI INTERACTIONS ---
+// --- UI Interactions ---
 function viewDailyRecords(patient) { navigateTo('daily-records', patient); }
 function viewCharting(record) { navigateTo('charting', record); }
-
 function showAddPatientForm() { document.getElementById('add-patient-form-container').classList.remove('hidden'); }
 function hideAddPatientForm() { document.getElementById('add-patient-form-container').classList.add('hidden'); }
 
@@ -194,45 +128,44 @@ function prefillTimeField() {
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     now.setSeconds(0);
     now.setMilliseconds(0);
-    const localIsoString = now.toISOString().slice(0, 16);
-    document.getElementById('entry-time').value = localIsoString;
+    document.getElementById('entry-time').value = now.toISOString().slice(0, 16);
 }
 
-// --- DATA MANIPULATION ---
+// --- Data Manipulation ---
 document.getElementById('add-patient-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
         const patientData = {
-            name: document.getElementById('patient-name').value,
-            mrn: document.getElementById('mrn').value,
-            dob: document.getElementById('dob').value,
-            gender: document.getElementById('gender').value,
-            diagnosis: document.getElementById('diagnosis').value,
+            name: document.getElementById('nama_pasien').value,
+            mrn: document.getElementById('no_mr').value,
+            admission_date: document.getElementById('tanggal_masuk').value,
+            baby_age: document.getElementById('umur_bayi').value,
+            gender: document.getElementById('jenis_kelamin').value,
+            diagnosis: document.getElementById('diagnosa_masuk').value,
+            delivery_history: document.getElementById('riwayat_persalinan').value,
+            gestational_age: document.getElementById('umur_kehamilan').value,
+            dob_time: document.getElementById('tgl_jam_lahir').value,
+            birth_weight_height: document.getElementById('bb_tb_lahir').value,
+            amniotic_fluid_color: document.getElementById('warna_ketuban').value,
+            delivery_method: document.getElementById('cara_lahir').value,
+            apgar_score: document.getElementById('nilai_apgar').value,
+            day_of_care: document.getElementById('hari_rawat').value,
         };
         await API.addPatient(patientData);
         renderPatientList();
         e.target.reset();
         hideAddPatientForm();
-    } catch (error) {
-        alert(`Error adding patient: ${error.message}`);
-    }
+    } catch (error) { alert(`Error: ${error.message}`); }
 });
 
 async function addDailyRecord() {
     try {
-        const nurseName = prompt("Enter the nurse's name for today's record:", "Nurse");
+        const nurseName = prompt("Masukkan nama perawat yang bertugas:", "Perawat");
         if (nurseName) {
-            const recordData = {
-                patientId: currentState.patient.id,
-                date: new Date().toISOString().slice(0, 10),
-                nurse: nurseName,
-            };
-            await API.addRecord(recordData);
+            await API.addRecord({ patientId: currentState.patient.id, date: new Date().toISOString().slice(0, 10), nurse: nurseName });
             renderDailyRecords();
         }
-    } catch (error) {
-        alert(`Error adding record: ${error.message}`);
-    }
+    } catch (error) { alert(`Error: ${error.message}`); }
 }
 
 document.getElementById('hourly-entry-form').addEventListener('submit', async (e) => {
@@ -241,72 +174,66 @@ document.getElementById('hourly-entry-form').addEventListener('submit', async (e
         const entryData = {
             recordId: currentState.record.id,
             time: document.getElementById('entry-time').value,
-            vitals: {
-                temp: document.getElementById('temperature').value || null,
-                hr: document.getElementById('heart-rate').value || null,
-                rr: document.getElementById('resp-rate').value || null,
-                o2: document.getElementById('sat-o2').value || null,
-                bp: document.getElementById('bp').value || null,
-                map: document.getElementById('map').value || null,
-            },
-            fluids: {
-                intakeOral: document.getElementById('intake-oral').value || null,
-                intakeIv: document.getElementById('intake-iv').value || null,
-                intakeMeds: document.getElementById('intake-meds').value || null,
-                outputUrine: document.getElementById('output-urine').value || null,
-                outputFeces: document.getElementById('output-feces').value || null,
-                outputVomit: document.getElementById('output-vomit').value || null,
-            }
+            by_vital: document.getElementById('by_vital').value,
+            ink_vital: document.getElementById('ink_vital').value,
+            tk_vital: document.getElementById('tk_vital').value,
+            wk_vital: document.getElementById('wk_vital').value,
+            apnea: document.getElementById('apnea').value,
+            fn_vital: document.getElementById('fn_vital').value,
+            fp_vital: document.getElementById('fp_vital').value,
+            td_vital: document.getElementById('td_vital').value,
+            map_vital: document.getElementById('map_vital').value,
+            sat_o2: document.getElementById('sat_o2').value,
+            crt_vital: document.getElementById('crt_vital').value,
+            vi_vital: document.getElementById('vi_vital').value,
+            vita_vital: document.getElementById('vita_vital').value,
+            pn_vital: document.getElementById('pn_vital').value,
+            ve_vital: document.getElementById('ve_vital').value,
+            leak_vital: document.getElementById('leak_vital').value,
+            urine: document.getElementById('urine').value,
+            feces: document.getElementById('feces').value,
+            muntah: document.getElementById('muntah').value,
+            mgt: document.getElementById('mgt').value,
+            drain: document.getElementById('drain').value,
+            iwl: document.getElementById('iwl').value,
+            vm_mode: document.getElementById('vm_mode').value,
+            vm_rate: document.getElementById('vm_rate').value,
+            vm_it: document.getElementById('vm_it').value,
+            vm_ie: document.getElementById('vm_ie').value,
+            vm_fio2: document.getElementById('vm_fio2').value,
+            vm_flow: document.getElementById('vm_flow').value,
+            vm_pip: document.getElementById('vm_pip').value,
+            vm_peep: document.getElementById('vm_peep').value,
+            vm_psv: document.getElementById('vm_psv').value,
+            vm_ka: document.getElementById('vm_ka').value,
+            vm_ki: document.getElementById('vm_ki').value,
         };
-
         await API.addEntry(entryData);
         renderHourlyChart();
         e.target.reset();
         prefillTimeField();
-    } catch (error) {
-        alert(`Error adding entry: ${error.message}`);
-    }
+    } catch (error) { alert(`Error: ${error.message}`); }
 });
 
-
-async function deletePatient(patientId, patientName) {
-    if (confirm(`Are you sure you want to permanently delete ${patientName} and all of their records? This action cannot be undone.`)) {
-        try {
-            await API.deletePatient(patientId);
-            renderPatientList();
-        } catch(error) {
-            alert(`Error deleting patient: ${error.message}`);
-        }
+async function deletePatient(id, name) {
+    if (confirm(`Anda yakin ingin menghapus ${name}? Semua data terkait akan hilang.`)) {
+        try { await API.deletePatient(id); renderPatientList(); } catch (error) { alert(`Error: ${error.message}`); }
     }
 }
 
-async function deleteRecord(recordId, recordDate) {
-    if (confirm(`Are you sure you want to delete the record for ${recordDate}? All hourly data for this day will be lost.`)) {
-        try {
-            await API.deleteRecord(recordId);
-            renderDailyRecords();
-        } catch (error) {
-            alert(`Error deleting record: ${error.message}`);
-        }
+async function deleteRecord(id, date) {
+    if (confirm(`Anda yakin ingin menghapus catatan untuk tanggal ${date}?`)) {
+        try { await API.deleteRecord(id); renderDailyRecords(); } catch (error) { alert(`Error: ${error.message}`); }
     }
 }
 
-// FIXED: This function now works correctly
-async function deleteEntry(timeISOString) {
-    const displayTime = new Date(timeISOString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (confirm(`Are you sure you want to delete all entries for ${displayTime}?`)) {
-        const deleteData = {
-            recordId: currentState.record.id,
-            time: timeISOString
-        };
-        
+async function deleteEntry(timeISO) {
+    const displayTime = new Date(timeISO).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (confirm(`Anda yakin ingin menghapus entri untuk jam ${displayTime}?`)) {
         try {
-            await API.deleteEntry(deleteData);
-            renderHourlyChart(); // Refresh the log to show the deletion
-        } catch (error) {
-            console.error('Failed to delete entry:', error);
-            alert(`Could not delete the entry: ${error.message}`);
-        }
+            await API.deleteEntry({ recordId: currentState.record.id, time: timeISO });
+            renderHourlyChart();
+        } catch (error) { alert(`Error: ${error.message}`); }
     }
 }
 

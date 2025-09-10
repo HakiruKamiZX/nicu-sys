@@ -5,170 +5,95 @@ const db = require('./db');
 const app = express();
 const port = 3000;
 
-// Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- API ROUTES ---
-
-// ... (Patient and Daily Record routes remain the same) ...
-// GET all patients
+// --- API PASIEN ---
 app.get('/api/patients', async (req, res) => {
     try {
-        const [patients] = await db.query('SELECT * FROM patients ORDER BY name');
+        const [patients] = await db.query('SELECT id, name, mrn, dob_time FROM patients ORDER BY name');
         res.json(patients);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch patients', details: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST a new patient
 app.post('/api/patients', async (req, res) => {
     try {
-        const { name, mrn, dob, gender, diagnosis } = req.body;
+        const p = req.body;
         const [result] = await db.query(
-            'INSERT INTO patients (name, mrn, dob, gender, diagnosis) VALUES (?, ?, ?, ?, ?)',
-            [name, mrn, dob, gender, diagnosis]
+            `INSERT INTO patients (name, mrn, admission_date, baby_age, gender, diagnosis, delivery_history, 
+            gestational_age, dob_time, birth_weight_height, amniotic_fluid_color, delivery_method, apgar_score, day_of_care) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [p.name, p.mrn, p.admission_date, p.baby_age, p.gender, p.diagnosis, p.delivery_history, 
+            p.gestational_age, p.dob_time, p.birth_weight_height, p.amniotic_fluid_color, p.delivery_method, p.apgar_score, p.day_of_care]
         );
         res.status(201).json({ id: result.insertId, ...req.body });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to create patient', details: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DELETE a patient
 app.delete('/api/patients/:id', async (req, res) => {
     try {
-        const { id } = req.params;
-        const [result] = await db.query('DELETE FROM patients WHERE id = ?', [id]);
-        if (result.affectedRows > 0) {
-            res.status(200).json({ message: 'Patient and all associated data deleted successfully' });
-        } else {
-            res.status(404).json({ message: 'Patient not found' });
-        }
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to delete patient', details: err.message });
-    }
+        await db.query('DELETE FROM patients WHERE id = ?', [req.params.id]);
+        res.status(204).send();
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// GET daily records for a specific patient
+
+// --- API CATATAN HARIAN ---
 app.get('/api/patients/:patientId/records', async (req, res) => {
     try {
-        const { patientId } = req.params;
-        const [records] = await db.query('SELECT * FROM daily_records WHERE patientId = ? ORDER BY date DESC', [patientId]);
+        const [records] = await db.query('SELECT * FROM daily_records WHERE patientId = ? ORDER BY date DESC', [req.params.patientId]);
         res.json(records);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch records', details: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST a new daily record
 app.post('/api/records', async (req, res) => {
     try {
         const { patientId, date, nurse } = req.body;
-        const [result] = await db.query(
-            'INSERT INTO daily_records (patientId, date, nurse) VALUES (?, ?, ?)',
-            [patientId, date, nurse]
-        );
+        const [result] = await db.query('INSERT INTO daily_records (patientId, date, nurse) VALUES (?, ?, ?)', [patientId, date, nurse]);
         res.status(201).json({ id: result.insertId, ...req.body });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to create record', details: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DELETE a daily record
 app.delete('/api/records/:id', async (req, res) => {
     try {
-        const { id } = req.params;
-        const [result] = await db.query('DELETE FROM daily_records WHERE id = ?', [id]);
-        if (result.affectedRows > 0) {
-            res.status(200).json({ message: 'Daily record deleted successfully' });
-        } else {
-            res.status(404).json({ message: 'Record not found' });
-        }
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to delete record', details: err.message });
-    }
+        await db.query('DELETE FROM daily_records WHERE id = ?', [req.params.id]);
+        res.status(204).send();
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 
-// GET combined hourly data for a specific record
-app.get('/api/records/:recordId/chart', async (req, res) => {
+// --- API ENTRI PER JAM (BARU) ---
+app.get('/api/records/:recordId/entries', async (req, res) => {
     try {
-        const { recordId } = req.params;
-        const [vitals] = await db.query('SELECT * FROM vital_signs WHERE recordId = ?', [recordId]);
-        const [fluids] = await db.query('SELECT * FROM fluid_balance WHERE recordId = ?', [recordId]);
-        res.json({ vitals, fluids });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch chart data', details: err.message });
-    }
+        const [entries] = await db.query('SELECT * FROM hourly_entries WHERE recordId = ? ORDER BY time DESC', [req.params.recordId]);
+        res.json(entries);
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
-// Add a complete hourly entry (vitals and fluids)
 app.post('/api/entries', async (req, res) => {
-    const connection = await db.getConnection();
     try {
-        const { recordId, time, vitals, fluids } = req.body;
-        
-        await connection.beginTransaction();
-
-        // Insert Vitals
-        await connection.query(
-            'INSERT INTO vital_signs (recordId, time, temp, hr, rr, o2, bp, map) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [recordId, time, vitals.temp, vitals.hr, vitals.rr, vitals.o2, vitals.bp, vitals.map]
+        const e = req.body;
+        const [result] = await db.query(
+            `INSERT INTO hourly_entries (recordId, time, by_vital, ink_vital, tk_vital, wk_vital, apnea, fn_vital, fp_vital, td_vital, 
+            map_vital, sat_o2, crt_vital, vi_vital, vita_vital, pn_vital, ve_vital, leak_vital, urine, feces, muntah, mgt, drain, iwl, 
+            vm_mode, vm_rate, vm_it, vm_ie, vm_fio2, vm_flow, vm_pip, vm_peep, vm_psv, vm_ka, vm_ki) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [e.recordId, e.time, e.by_vital, e.ink_vital, e.tk_vital, e.wk_vital, e.apnea, e.fn_vital, e.fp_vital, e.td_vital, 
+            e.map_vital, e.sat_o2, e.crt_vital, e.vi_vital, e.vita_vital, e.pn_vital, e.ve_vital, e.leak_vital, e.urine, e.feces, e.muntah, e.mgt, e.drain, e.iwl, 
+            e.vm_mode, e.vm_rate, e.vm_it, e.vm_ie, e.vm_fio2, e.vm_flow, e.vm_pip, e.vm_peep, e.vm_psv, e.vm_ka, e.vm_ki]
         );
-        // Insert Fluids
-        await connection.query(
-            'INSERT INTO fluid_balance (recordId, time, intakeOral, intakeIv, intakeMeds, outputUrine, outputFeces, outputVomit) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [recordId, time, fluids.intakeOral, fluids.intakeIv, fluids.intakeMeds, fluids.outputUrine, fluids.outputFeces, fluids.outputVomit]
-        );
-
-        await connection.commit();
-        res.status(201).json({ message: 'Entry created successfully' });
-
-    } catch (err) {
-        await connection.rollback();
-        res.status(500).json({ error: 'Failed to create entry', details: err.message });
-    } finally {
-        connection.release();
-    }
+        res.status(201).json({ id: result.insertId, ...req.body });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
-// **FIXED**: Delete an entire hourly entry (vitals and fluids)
 app.delete('/api/entries', async (req, res) => {
-    const connection = await db.getConnection();
     try {
         const { recordId, time } = req.body;
-        if (!recordId || !time) {
-            return res.status(400).json({ error: 'recordId and time are required' });
-        }
-        
-        // Convert the incoming ISO string to a Date object.
-        // The mysql2 driver will automatically format this correctly for the DATETIME column.
         const timeAsDateObject = new Date(time);
-
-        await connection.beginTransaction();
-        
-        await connection.query('DELETE FROM vital_signs WHERE recordId = ? AND time = ?', [recordId, timeAsDateObject]);
-        await connection.query('DELETE FROM fluid_balance WHERE recordId = ? AND time = ?', [recordId, timeAsDateObject]);
-
-        await connection.commit();
-        res.status(200).json({ message: 'Entry deleted successfully' });
-
-    } catch (err) {
-        await connection.rollback();
-        console.error("Error during entry deletion:", err); // Added server-side logging
-        res.status(500).json({ error: 'Failed to delete entry', details: err.message });
-    } finally {
-        connection.release();
-    }
+        await db.query('DELETE FROM hourly_entries WHERE recordId = ? AND time = ?', [recordId, timeAsDateObject]);
+        res.status(204).send();
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
-// Start server
-app.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`);
-});
+app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
 
