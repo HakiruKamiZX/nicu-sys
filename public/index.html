@@ -28,12 +28,13 @@
         <!-- Main Content Area -->
         <main>
             <!-- Page 1: Patient List -->
-            <div id="page-patients" class="page active page-transition">
+            <div id="page-patients" class="page active">
                 <div class="bg-white p-6 rounded-lg shadow-md">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-semibold">Manajemen Pasien</h2>
                         <button onclick="showAddPatientForm()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">+ Tambah Pasien Baru</button>
                     </div>
+                    
 
                     <!-- Add Patient Form (Updated) -->
                     <div id="add-patient-form-container" class="hidden mb-6 p-6 bg-gray-50 rounded-lg border border-gray-200">
@@ -59,13 +60,36 @@
                             </div>
                         </form>
                     </div>
-
                     <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="bg-gray-200"><th class="p-3">No. MR</th><th class="p-3">Nama</th><th class="p-3">Tanggal Lahir</th><th class="p-3">Aksi</th></tr></thead><tbody id="patient-list-body"></tbody></table></div>
                 </div>
             </div>
 
             <!-- Page 2: Daily Records -->
-            <div id="page-daily-records" class="page page-transition"><!-- ... (content is the same) ... --></div>
+            <div id="page-daily-records" class="page">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                         <div>
+                            <h2 class="text-xl font-semibold">Catatan Harian untuk <span id="records-patient-name" class="text-blue-600"></span></h2>
+                         </div>
+                        <div class="flex space-x-2">
+                            <button onclick="navigateTo('patients')" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">&larr; Kembali ke Pasien</button>
+                            <button onclick="addDailyRecord()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">+ Tambah Catatan Hari Ini</button>
+                        </div>
+                    </div>
+                     <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="bg-gray-200">
+                                    <th class="p-3">Tanggal Catatan</th>
+                                    <th class="p-3">Perawat Bertugas</th>
+                                    <th class="p-3">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="daily-records-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
 
             <!-- Page 3: Hourly Charting (Updated) -->
             <div id="page-charting" class="page">
@@ -134,6 +158,68 @@
             </div>
         </main>
     </div>
+
+        <!-- MODALS -->
+
+    <!-- Add/Edit Patient Modal -->
+    <div id="patient-modal" class="modal-overlay hidden fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-full overflow-y-auto p-6" onclick="event.stopPropagation()">
+            <h3 id="patient-modal-title" class="text-xl font-semibold mb-4"></h3>
+            <form id="patient-form">
+                <input type="hidden" id="patient-id">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <!-- Fields will be the same as the old form -->
+                    <div class="col-span-1"><label for="patient-form-nama_pasien" class="block text-sm font-medium text-gray-700">Nama Pasien</label><input type="text" id="patient-form-nama_pasien" class="mt-1 p-2 w-full border rounded-md" required></div>
+                    <div class="col-span-1"><label for="patient-form-no_mr" class="block text-sm font-medium text-gray-700">No. MR</label><input type="text" id="patient-form-no_mr" class="mt-1 p-2 w-full border rounded-md" required></div>
+                    <div class="col-span-1"><label for="patient-form-tanggal_masuk" class="block text-sm font-medium text-gray-700">Tanggal Masuk</label><input type="date" id="patient-form-tanggal_masuk" class="mt-1 p-2 w-full border rounded-md"></div>
+                    <div class="col-span-1"><label for="patient-form-umur_bayi" class="block text-sm font-medium text-gray-700">Umur Bayi</label><input type="text" id="patient-form-umur_bayi" class="mt-1 p-2 w-full border rounded-md"></div>
+                    <div class="col-span-1"><label for="patient-form-jenis_kelamin" class="block text-sm font-medium text-gray-700">Jenis Kelamin</label><select id="patient-form-jenis_kelamin" class="mt-1 p-2 w-full border rounded-md"><option value="Male">Laki-laki</option><option value="Female">Perempuan</option></select></div>
+                    <div class="col-span-1"><label for="patient-form-tgl_jam_lahir" class="block text-sm font-medium text-gray-700">Tgl/Jam Lahir</label><input type="datetime-local" id="patient-form-tgl_jam_lahir" class="mt-1 p-2 w-full border rounded-md"></div>
+                    <div class="col-span-3"><label for="patient-form-diagnosa_masuk" class="block text-sm font-medium text-gray-700">Diagnosa Masuk</label><textarea id="patient-form-diagnosa_masuk" class="mt-1 p-2 w-full border rounded-md" rows="2"></textarea></div>
+                    <div class="col-span-3"><label for="patient-form-riwayat_persalinan" class="block text-sm font-medium text-gray-700">Riwayat Persalinan</label><textarea id="patient-form-riwayat_persalinan" class="mt-1 p-2 w-full border rounded-md" rows="2"></textarea></div>
+                    <div class="col-span-1"><label for="patient-form-umur_kehamilan" class="block text-sm font-medium text-gray-700">Umur Kehamilan</label><input type="text" id="patient-form-umur_kehamilan" class="mt-1 p-2 w-full border rounded-md"></div>
+                    <div class="col-span-1"><label for="patient-form-bb_tb_lahir" class="block text-sm font-medium text-gray-700">BB/TB Lahir</label><input type="text" id="patient-form-bb_tb_lahir" class="mt-1 p-2 w-full border rounded-md"></div>
+                    <div class="col-span-1"><label for="patient-form-warna_ketuban" class="block text-sm font-medium text-gray-700">Warna Ketuban</label><input type="text" id="patient-form-warna_ketuban" class="mt-1 p-2 w-full border rounded-md"></div>
+                    <div class="col-span-1"><label for="patient-form-cara_lahir" class="block text-sm font-medium text-gray-700">Cara Lahir</label><input type="text" id="patient-form-cara_lahir" class="mt-1 p-2 w-full border rounded-md"></div>
+                    <div class="col-span-1"><label for="patient-form-nilai_apgar" class="block text-sm font-medium text-gray-700">Nilai Apgar (A/S)</label><input type="text" id="patient-form-nilai_apgar" class="mt-1 p-2 w-full border rounded-md"></div>
+                    <div class="col-span-1"><label for="patient-form-hari_rawat" class="block text-sm font-medium text-gray-700">Hari Rawat</label><input type="number" id="patient-form-hari_rawat" class="mt-1 p-2 w-full border rounded-md"></div>
+                </div>
+                <div class="flex justify-end space-x-2 mt-6">
+                    <button type="button" onclick="closePatientModal()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">Batal</button>
+                    <button type="submit" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Edit Entry Modal -->
+    <div id="entry-modal" class="modal-overlay hidden fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-full overflow-y-auto p-6" onclick="event.stopPropagation()">
+            <h3 class="text-xl font-semibold mb-4">Edit Entri Per Jam</h3>
+            <form id="edit-entry-form">
+                <input type="hidden" id="edit-entry-id">
+                 <!-- The form structure will be identical to the "add entry" form -->
+                 <div class="mb-6"><label for="edit-entry-time" class="block text-sm font-medium text-gray-700 mb-1">Waktu Entri</label><input type="datetime-local" id="edit-entry-time" class="w-full md:w-1/3 p-2 border border-gray-300 rounded-md shadow-sm" required></div>
+                 <div class="p-4 bg-gray-50 rounded-lg border mb-6">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-4">Tanda Vital & Cairan</h4>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4" id="edit-entry-vitals-fluids">
+                        <!-- Fields are dynamically populated by JS -->
+                    </div>
+                </div>
+                <div class="p-4 bg-gray-50 rounded-lg border">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-4">Ventilasi Mesin</h4>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4" id="edit-entry-ventilator">
+                        <!-- Fields are dynamically populated by JS -->
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-2 mt-6">
+                    <button type="button" onclick="closeEntryModal()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">Batal</button>
+                    <button type="submit" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="/js/app.js"></script>
 </body>
 </html>
