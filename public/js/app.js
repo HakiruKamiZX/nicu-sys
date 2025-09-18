@@ -121,7 +121,14 @@ async function renderHourlyChart() {
         const entries = await API.getEntries(currentState.record.id);
         currentState.hourlyEntries = entries;
         const tbody = document.getElementById('hourly-log-body');
+        
+        // **FIX**: Check if the table body exists before trying to modify it.
+        if (!tbody) {
+            console.error("Error: Could not find the 'hourly-log-body' element. Is the charting page visible?");
+            return;
+        }
         tbody.innerHTML = '';
+
         entries.forEach(e => {
             const tr = document.createElement('tr');
             const displayTime = new Date(e.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -148,6 +155,13 @@ async function renderHourlyChart() {
 function populateAddFormFields() {
     const vitalsContainer = document.getElementById('add-entry-vitals-fluids');
     const ventilatorContainer = document.getElementById('add-entry-ventilator');
+    
+    // **FIX**: Check if form containers exist before modifying them.
+    if (!vitalsContainer || !ventilatorContainer) {
+        console.error("Error: Could not find hourly entry form containers.");
+        return;
+    }
+    
     vitalsContainer.innerHTML = '';
     ventilatorContainer.innerHTML = '';
 
@@ -182,11 +196,9 @@ async function openPatientModal(mode, id = null) {
             patientModalTitle.textContent = `Edit Pasien: ${patient.name}`;
             document.getElementById('patient-id').value = patient.id;
             
-            // Helper function to format dates
             const formatDate = (dateString) => dateString ? new Date(dateString).toISOString().slice(0, 10) : '';
             const formatDateTime = (dateTimeString) => dateTimeString ? new Date(new Date(dateTimeString).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : '';
 
-            // Populate form
             document.getElementById('patient-form-nama_pasien').value = patient.name || '';
             document.getElementById('patient-form-no_mr').value = patient.mrn || '';
             document.getElementById('patient-form-tanggal_masuk').value = formatDate(patient.admission_date);
@@ -232,11 +244,8 @@ patientForm.addEventListener('submit', async (e) => {
     };
 
     try {
-        if (id) {
-            await API.updatePatient(id, patientData);
-        } else {
-            await API.addPatient(patientData);
-        }
+        if (id) { await API.updatePatient(id, patientData); } 
+        else { await API.addPatient(patientData); }
         closePatientModal();
         renderPatientList();
     } catch (error) { alert(`Error saving patient: ${error.message}`); }
@@ -246,7 +255,7 @@ patientForm.addEventListener('submit', async (e) => {
 const entryModal = document.getElementById('entry-modal');
 const editEntryForm = document.getElementById('edit-entry-form');
 
-async function openEntryModal(entryId) {
+async function openEntryModal(entryId) { 
     const entry = currentState.hourlyEntries.find(e => e.id === entryId);
     if (!entry) return;
 
@@ -271,11 +280,37 @@ async function openEntryModal(entryId) {
     });
 
     entryModal.classList.remove('hidden');
-}
+ }
+function closeEntryModal() { entryModal.classList.add('hidden'); }
 
-function closeEntryModal() {
-    entryModal.classList.add('hidden');
-}
+
+// **FIX**: Memperbaiki logika pengumpulan data formulir untuk mencegah error
+const allFields = [
+    'by_vital', 'ink_vital', 'tk_vital', 'wk_vital', 'apnea', 'fn_vital', 'fp_vital', 'td_vital', 'map_vital', 'sat_o2', 'crt_vital', 'vi_vital', 'vita_vital', 'pn_vital', 've_vital', 'leak_vital', 'urine', 'feces', 'muntah', 'mgt', 'drain', 'iwl',
+    'vm_mode', 'vm_rate', 'vm_it', 'vm_ie', 'vm_fio2', 'vm_flow', 'vm_pip', 'vm_peep', 'vm_psv', 'vm_ka', 'vm_ki'
+];
+
+document.getElementById('hourly-entry-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+        const entryData = {
+            recordId: currentState.record.id,
+            time: document.getElementById('entry-time').value,
+        };
+        
+        allFields.forEach(key => {
+            const element = document.getElementById(`add-${key}`);
+            // Cek jika elemen ada sebelum mengambil nilainya
+            entryData[key] = element ? element.value : null;
+        });
+
+        await API.addEntry(entryData);
+        renderHourlyChart();
+        e.target.reset();
+        prefillTimeField();
+    } catch (error) { alert(`Error submitting entry: ${error.message}`); }
+});
+
 
 editEntryForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -284,13 +319,10 @@ editEntryForm.addEventListener('submit', async (e) => {
         time: document.getElementById('edit-entry-time').value,
     };
 
-    const allFields = [
-        'by_vital', 'ink_vital', 'tk_vital', 'wk_vital', 'apnea', 'fn_vital', 'fp_vital', 'td_vital', 'map_vital', 'sat_o2', 'crt_vital', 'vi_vital', 'vita_vital', 'pn_vital', 've_vital', 'leak_vital', 'urine', 'feces', 'muntah', 'mgt', 'drain', 'iwl',
-        'vm_mode', 'vm_rate', 'vm_it', 'vm_ie', 'vm_fio2', 'vm_flow', 'vm_pip', 'vm_peep', 'vm_psv', 'vm_ka', 'vm_ki'
-    ];
-
     allFields.forEach(key => {
-        entryData[key] = document.getElementById(`edit-${key}`).value;
+        const element = document.getElementById(`edit-${key}`);
+        // Cek jika elemen ada sebelum mengambil nilainya
+        entryData[key] = element ? element.value : null;
     });
 
     try {
@@ -312,28 +344,6 @@ function prefillTimeField() {
     now.setMilliseconds(0);
     document.getElementById('entry-time').value = now.toISOString().slice(0, 16);
 }
-
-document.getElementById('hourly-entry-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    try {
-        const entryData = {
-            recordId: currentState.record.id,
-            time: document.getElementById('entry-time').value,
-        };
-        const allFields = [
-            'by_vital', 'ink_vital', 'tk_vital', 'wk_vital', 'apnea', 'fn_vital', 'fp_vital', 'td_vital', 'map_vital', 'sat_o2', 'crt_vital', 'vi_vital', 'vita_vital', 'pn_vital', 've_vital', 'leak_vital', 'urine', 'feces', 'muntah', 'mgt', 'drain', 'iwl',
-            'vm_mode', 'vm_rate', 'vm_it', 'vm_ie', 'vm_fio2', 'vm_flow', 'vm_pip', 'vm_peep', 'vm_psv', 'vm_ka', 'vm_ki'
-        ];
-        allFields.forEach(key => {
-            entryData[key] = document.getElementById(`add-${key}`).value;
-        });
-
-        await API.addEntry(entryData);
-        renderHourlyChart();
-        e.target.reset();
-        prefillTimeField();
-    } catch (error) { alert(`Error: ${error.message}`); }
-});
 
 async function addDailyRecord() {
     try {
